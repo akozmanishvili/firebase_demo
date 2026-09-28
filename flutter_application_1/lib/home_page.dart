@@ -7,7 +7,7 @@ import 'app_state.dart';
 import 'guest_book.dart';
 import 'src/authentication.dart';
 import 'src/widgets.dart';
-import 'yes_no_selection.dart';
+import 'guest_count_selection.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -52,9 +52,9 @@ class HomePage extends StatelessWidget {
                   _ => const Paragraph('No one going'),
                 },
                 if (appState.loggedIn) ...[
-                  YesNoSelection(
-                    state: appState.attending,
-                    onSelection: (attending) => appState.attending = attending,
+                  GuestCountSelection(
+                    count: appState.myGuestCount,
+                    onSubmit: (n) => appState.setGuestCount(n),
                   ),
                   const Header('Discussion'),
                   GuestBook(

@@ -10,8 +10,6 @@ import 'dart:async';
 import 'guest_book_message.dart';
 import 'firebase_options.dart';
 
-enum Attending { yes, no, unknown }
-
 class ApplicationState extends ChangeNotifier {
   ApplicationState() {
     init();
@@ -25,18 +23,18 @@ class ApplicationState extends ChangeNotifier {
   int _attendees = 0;
   int get attendees => _attendees;
 
-  Attending _attending = Attending.unknown;
   StreamSubscription<DocumentSnapshot>? _attendingSubscription;
-  Attending get attending => _attending;
-  set attending(Attending attending) {
-    final userDoc = FirebaseFirestore.instance
-        .collection('attendees')
-        .doc(FirebaseAuth.instance.currentUser!.uid);
-    if (attending == Attending.yes) {
-      userDoc.set(<String, dynamic>{'attending': true});
-    } else {
-      userDoc.set(<String, dynamic>{'attending': false});
+  int? _myGuestCount;
+  int? get myGuestCount => _myGuestCount;
+
+  Future<void> setGuestCount(int count) {
+    if (!_loggedIn) {
+      throw Exception('Must be logged in');
     }
+    return FirebaseFirestore.instance
+        .collection('attendees')
+        .doc(FirebaseAuth.instance.currentUser!.uid)
+        .set(<String, dynamic>{'count': count});
   }
 
   Future<void> init() async {
@@ -46,14 +44,16 @@ class ApplicationState extends ChangeNotifier {
 
     FirebaseUIAuth.configureProviders([EmailAuthProvider()]);
 
-    FirebaseFirestore.instance
-        .collection('attendees')
-        .where('attending', isEqualTo: true)
-        .snapshots()
-        .listen((snapshot) {
-          _attendees = snapshot.docs.length;
-          notifyListeners();
-        });
+    FirebaseFirestore.instance.collection('attendees').snapshots().listen((
+      snapshot,
+    ) {
+      int total = 0;
+      for (final doc in snapshot.docs) {
+        total += (doc.data()['count'] as num?)?.toInt() ?? 0;
+      }
+      _attendees = total;
+      notifyListeners();
+    });
 
     FirebaseAuth.instance.userChanges().listen((user) {
       if (user != null) {
@@ -79,20 +79,13 @@ class ApplicationState extends ChangeNotifier {
             .doc(user.uid)
             .snapshots()
             .listen((snapshot) {
-              if (snapshot.data() != null) {
-                if (snapshot.data()!['attending'] as bool) {
-                  _attending = Attending.yes;
-                } else {
-                  _attending = Attending.no;
-                }
-              } else {
-                _attending = Attending.unknown;
-              }
+              _myGuestCount = (snapshot.data()?['count'] as num?)?.toInt();
               notifyListeners();
             });
       } else {
         _loggedIn = false;
         _guestBookMessages = [];
+        _myGuestCount = null;
         _guestBookSubscription?.cancel();
         _attendingSubscription?.cancel();
       }
